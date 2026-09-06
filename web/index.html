@@ -34,14 +34,14 @@
   input[type=text]:focus{outline:none;border-color:var(--acc)}
   main{padding:10px 14px;overflow-y:auto;flex:1}
 
-  .node{padding:3px 2px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px;border-radius:6px}
+  .node{padding:3px 2px;cursor:pointer;display:flex;align-items:flex-start;gap:4px;border-radius:6px}
   .node:hover{color:var(--acc);background:var(--panel)}
   .node.playing{color:var(--good)}
   .node.flash{background:var(--panel2);outline:1px solid var(--acc)}
   .kids{margin-left:14px;border-left:1px solid var(--line);padding-left:8px}
   .ic{display:inline-block;width:1.2em;color:var(--mut);flex:none;text-align:center}
-  .nm{overflow:hidden;text-overflow:ellipsis}
-  .fkind{color:var(--mut);font-size:12px;margin-left:6px;flex:none}
+  .nm{flex:1;min-width:0;overflow-wrap:anywhere;word-break:break-word}
+  .fkind{color:var(--mut);font-size:12px;margin-left:6px;flex:none;white-space:nowrap}
   .fadd{flex:none;color:var(--mut);opacity:0;font-size:15px;padding:0 4px}
   .node:hover .fadd{opacity:1}
   .fadd:hover{color:var(--acc)}
