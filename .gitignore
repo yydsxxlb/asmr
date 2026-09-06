@@ -1,0 +1,13 @@
+# heavy / local-only — never commit (see CLAUDE.md)
+graph.sqlite
+web/media/
+downloads/
+sync_full.log
+httpd.log
+_dl_list.json
+_chk.js
+__pycache__/
+*.pyc
+
+# claude runtime
+.claude/scheduled_tasks.lock
