@@ -8,7 +8,9 @@ Usage:
     python crawler/crawl.py --mount asmr    # single mount
 """
 import argparse
+import json
 import os
+import re
 import sqlite3
 import sys
 import urllib.request
@@ -29,7 +31,7 @@ CREATE INDEX IF NOT EXISTS ix_kind ON nodes(kind);
 CREATE VIRTUAL TABLE IF NOT EXISTS files_fts
   USING fts5(name, path UNINDEXED, tokenize='trigram');
 CREATE TABLE IF NOT EXISTS subs(
-  media_path TEXT, sub_path TEXT, text TEXT);
+  media_path TEXT, sub_path TEXT, text TEXT, cues TEXT);
 CREATE VIRTUAL TABLE IF NOT EXISTS subs_fts
   USING fts5(text, media_path UNINDEXED, sub_path UNINDEXED,
              tokenize='trigram');
@@ -40,6 +42,10 @@ CREATE TABLE IF NOT EXISTS crawl_state(path TEXT PRIMARY KEY, modified TEXT);
 def db():
     c = sqlite3.connect(DB_PATH)
     c.executescript(SCHEMA)
+    cols = {r[1] for r in c.execute("PRAGMA table_info(subs)")}
+    if "cues" not in cols:                        # migrate older DBs
+        c.execute("ALTER TABLE subs ADD COLUMN cues TEXT")
+        c.commit()
     return c
 
 
@@ -67,6 +73,63 @@ def parse_sub(text, ext):
         if s:
             lines.append(s)
     return " ".join(lines)
+
+
+_LRC_TS = re.compile(r"\[(\d+):(\d{1,2})(?:[.:](\d{1,3}))?\]")
+_SRT_TS = re.compile(r"(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})")
+_ASS_TS = re.compile(r"(\d+):(\d{2}):(\d{2})[.:](\d{1,2})")
+
+
+def _secs(h, m, s, frac, fdigits):
+    f = int(frac or 0) / (10 ** len(fdigits)) if frac else 0.0
+    return int(h) * 3600 + int(m) * 60 + int(s) + f
+
+
+def parse_cues(text, ext):
+    """Parse a subtitle/lyric file into sorted [[seconds, line], ...] cues.
+    Keeps timecodes (unlike parse_sub, which strips them for search)."""
+    cues = []
+    if ext == ".lrc":
+        for ln in text.splitlines():
+            stamps = list(_LRC_TS.finditer(ln))
+            if not stamps:
+                continue
+            body = ln[stamps[-1].end():].strip()
+            if not body:
+                continue
+            for mt in stamps:
+                mm, ss, fr = mt.group(1), mt.group(2), mt.group(3)
+                cues.append([int(mm) * 60 + int(ss) + (int(fr) / (10 ** len(fr))
+                             if fr else 0.0), body])
+    elif ext in (".srt", ".vtt"):
+        blocks = re.split(r"\n\s*\n", text.replace("\r", ""))
+        for b in blocks:
+            m = _SRT_TS.search(b)
+            if not m:
+                continue
+            t = _secs(m.group(1), m.group(2), m.group(3), m.group(4), m.group(4))
+            body = []
+            for ln in b.splitlines():
+                s = ln.strip().lstrip("﻿")
+                if not s or s.isdigit() or "-->" in s or s.upper() == "WEBVTT":
+                    continue
+                body.append(s)
+            if body:
+                cues.append([t, " ".join(body)])
+    elif ext == ".ass":
+        for ln in text.splitlines():
+            if not ln.startswith("Dialogue:"):
+                continue
+            m = _ASS_TS.search(ln)
+            if not m:
+                continue
+            t = _secs(m.group(1), m.group(2), m.group(3), m.group(4), m.group(4))
+            body = ln.split(",", 9)[-1].replace("\\N", " ").strip()
+            body = re.sub(r"\{[^}]*\}", "", body)     # strip ass override tags
+            if body:
+                cues.append([t, body])
+    cues.sort(key=lambda x: x[0])
+    return cues
 
 
 def fetch_text(path):
@@ -194,11 +257,13 @@ def crawl(mounts, max_dirs=None, workers=8, force=False, seeds=None):
 
     def fetch_one(sp):
         try:
-            return sp, parse_sub(fetch_text(sp), ext_of(sp))
+            raw = fetch_text(sp)
+            ext = ext_of(sp)
+            return sp, parse_sub(raw, ext), parse_cues(raw, ext)
         except Exception:                                 # noqa: BLE001
-            return sp, None
+            return sp, None, None
     with ThreadPoolExecutor(max_workers=workers) as ex2:
-        for sp, txt in ex2.map(fetch_one, subs):
+        for sp, txt, cues in ex2.map(fetch_one, subs):
             if not txt:
                 continue
             key = norm_key(sp.rsplit("/", 1)[1])
@@ -207,8 +272,9 @@ def crawl(mounts, max_dirs=None, workers=8, force=False, seeds=None):
                 "SELECT path FROM nodes WHERE kind='audio' AND nkey=? "
                 "ORDER BY (parent=?) DESC LIMIT 1", (key, parent)).fetchone()
             media = row[0] if row else ""
-            c.execute("INSERT INTO subs(media_path,sub_path,text) VALUES(?,?,?)",
-                      (media, sp, txt))
+            cjson = json.dumps(cues, ensure_ascii=False) if cues else None
+            c.execute("INSERT INTO subs(media_path,sub_path,text,cues) "
+                      "VALUES(?,?,?,?)", (media, sp, txt, cjson))
             c.execute("INSERT INTO subs_fts(text,media_path,sub_path) "
                       "VALUES(?,?,?)", (txt, media, sp))
     c.commit()

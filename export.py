@@ -43,6 +43,8 @@ def main():
     os.makedirs(TREE, exist_ok=True)
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
+    if "cues" not in {r[1] for r in c.execute("PRAGMA table_info(subs)")}:
+        c.execute("ALTER TABLE subs ADD COLUMN cues TEXT")
 
     children = {}                              # parent path -> [entry, ...]
 
@@ -117,9 +119,16 @@ def main():
                    "dirs": len(idmap)},
     }
 
-    subs = [{"media": r["media_path"], "sub": r["sub_path"], "text": r["text"]}
-            for r in c.execute("SELECT media_path,sub_path,text FROM subs "
-                               "WHERE text<>''")]
+    subs, lyrics = [], {}
+    for r in c.execute("SELECT media_path,sub_path,text,cues FROM subs "
+                       "WHERE text<>''"):
+        subs.append({"media": r["media_path"], "sub": r["sub_path"],
+                     "text": r["text"]})
+        if r["cues"] and r["media_path"]:          # media -> timed cues
+            try:
+                lyrics[r["media_path"]] = json.loads(r["cues"])
+            except (ValueError, TypeError):
+                pass
 
     with open(os.path.join(OUT, "index.json"), "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, separators=(",", ":"))
@@ -127,6 +136,8 @@ def main():
         json.dump(names, f, ensure_ascii=False, separators=(",", ":"))
     with open(os.path.join(OUT, "subs.json"), "w", encoding="utf-8") as f:
         json.dump(subs, f, ensure_ascii=False, separators=(",", ":"))
+    with open(os.path.join(OUT, "lyrics.json"), "w", encoding="utf-8") as f:
+        json.dump(lyrics, f, ensure_ascii=False, separators=(",", ":"))
 
     # drop the old monolith so stale data can't be served
     old = os.path.join(OUT, "catalog.json")
@@ -137,6 +148,7 @@ def main():
           f"{len(mounts)} mounts")
     print(f"names.json: {len(names)} playable")
     print(f"subs.json: {len(subs)} subtitle docs")
+    print(f"lyrics.json: {len(lyrics)} media with timed cues")
     c.close()
 
 

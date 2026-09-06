@@ -77,6 +77,15 @@ python crawler/crawl.py --workers 8     # parallel requests (default 8)
 - Empty mounts `asmr3`/`asmr5` → backend 500 (`SharePoint Online` tenant has no
   SPO license). Nothing to crawl until the AList admin fixes the tenant.
 
+Subtitles/lyrics (`.srt/.vtt/.ass/.lrc`): the crawl stores stripped `subs.text`
+(for search) **and** timed `subs.cues` (for the synced overlay). To backfill cues
+for sub rows crawled before this feature (re-fetches only the sub files, no BFS):
+
+```bash
+python crawler/backfill_cues.py         # fill missing cues
+python crawler/backfill_cues.py --all   # re-parse every sub row
+```
+
 After a crawl, always re-run `export.py` to rebuild the site data.
 
 ## Refresh the site data (`export.py`)
@@ -90,6 +99,9 @@ Regenerates the **sharded** static catalog under `web/data/` from `graph.sqlite`
 - `names.json` — flat search index of **playable** media paths `[path, ...]`
   (audio/hls/video); lazy-loaded on first search.
 - `subs.json` — subtitle search index; lazy-loaded on first search.
+- `lyrics.json` — `{media: [[seconds, line], ...]}` timed cues (from `subs.cues`);
+  lazy-loaded on first play. Drives the draggable subtitle overlay (only shows
+  when the current track has cues; default on, hide → reopen button bottom-right).
 - Dir entries also carry `n`/`sz` = recursive descendant file count / total bytes
   (shown per folder on the site).
 
