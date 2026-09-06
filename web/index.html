@@ -110,9 +110,9 @@
   .cap-head .cap-t{flex:1;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
   .cap-head button{background:none;border:none;color:var(--mut);cursor:pointer;font-size:14px;padding:2px 6px}
   .cap-head button:hover{color:var(--acc)}
-  .cap-body{padding:10px 14px 14px;max-height:168px;overflow-y:auto;text-align:center}
-  .cap-line{font-size:14px;color:var(--mut);padding:3px 0;cursor:pointer;line-height:1.45}
-  .cap-line.on{color:var(--fg);font-weight:700;font-size:16px}
+  .cap-body{padding:8px 14px;max-height:84px;overflow-y:auto;text-align:center}
+  .cap-line{font-size:13px;color:var(--mut);padding:2px 0;cursor:pointer;line-height:1.4}
+  .cap-line.on{color:var(--fg);font-weight:700;font-size:15px}
   .cap-line:hover{color:var(--acc)}
   .capopen{position:fixed;right:18px;bottom:90px;width:44px;height:44px;border-radius:50%;
     background:var(--acc);color:#0b0d12;border:none;font-size:20px;cursor:pointer;z-index:40;
@@ -134,11 +134,10 @@
     .handle .mpp{font-size:20px;color:var(--acc)}
     .handle .mbtn{background:none;border:none;color:var(--acc);font-size:19px;cursor:pointer;padding:4px 6px;flex:none}
     main{padding-bottom:80px}
-    /* subtitle: single active line, sitting just above the folded sheet */
+    /* subtitle: single active line above the folded sheet; keep the drag bar
+       (with the ✕) so it stays draggable + closable on narrow screens too */
     .capbox{bottom:72px;top:auto;left:50%;transform:translateX(-50%);width:94vw}
-    .cap-head{position:absolute;right:2px;top:0;border:none;padding:2px 6px;z-index:1;cursor:default}
-    .cap-head .cap-t{display:none}
-    .cap-body{max-height:none;padding:8px 28px 8px 12px}
+    .cap-body{max-height:none;padding:6px 12px}
     .cap-line{display:none}
     .cap-line.on{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   }
@@ -553,9 +552,10 @@ function setCues(path){
   });
 }
 function applyCapPos(){ const box=$('#capBox'), s=capState();
-  if(innerWidth<=820){ box.style.left=''; box.style.top=''; box.style.bottom='';
-    box.style.transform=''; return; }              // mobile: use CSS default bar
-  if(s.x!=null&&s.y!=null){ box.style.left=s.x+'px'; box.style.top=s.y+'px';
+  if(s.x!=null&&s.y!=null){
+    const x=Math.max(0,Math.min(innerWidth-box.offsetWidth, s.x));
+    const y=Math.max(0,Math.min(innerHeight-box.offsetHeight, s.y));
+    box.style.left=x+'px'; box.style.top=y+'px';
     box.style.bottom='auto'; box.style.transform='none'; } }
 function updateCapVis(){
   const box=$('#capBox'), open=$('#capOpen');
