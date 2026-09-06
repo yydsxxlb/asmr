@@ -4,7 +4,7 @@
    Only same-origin GETs are cached. Media streams from the cross-origin file
    origin and is deliberately NOT cached (55 GB — let the browser/network handle
    it). Bump VERSION whenever the data layout changes so old shards are evicted. */
-const VERSION = 'asmr-v9';
+const VERSION = 'asmr-v10';
 
 self.addEventListener('install', e => self.skipWaiting());
 

@@ -52,8 +52,8 @@
 
   aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;height:100vh;min-width:0}
   .np{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
-  .np .title{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .np .sub{color:var(--mut);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+  .np .title{font-weight:700;font-size:15px;overflow-wrap:anywhere;word-break:break-word}
+  .np .sub{color:var(--mut);font-size:12px;overflow-wrap:anywhere;word-break:break-word;margin-top:2px}
   .np .err{color:var(--bad);font-size:12px;margin-top:4px;min-height:16px}
 
   .seek{display:flex;align-items:center;gap:8px;margin-top:12px;font-variant-numeric:tabular-nums;color:var(--mut);font-size:12px}
