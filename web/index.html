@@ -104,13 +104,13 @@
   /* subtitle/lyrics overlay */
   .capbox{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);width:min(680px,90vw);
     background:rgba(15,17,22,.92);border:1px solid var(--line);border-radius:12px;z-index:40;
-    box-shadow:0 8px 30px rgba(0,0,0,.55);backdrop-filter:blur(4px);user-select:none}
+    box-shadow:0 8px 30px rgba(0,0,0,.55);backdrop-filter:blur(4px);user-select:none;
+    cursor:move;touch-action:none}
   .capbox.hide{display:none}
-  .cap-head{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:move;border-bottom:1px solid var(--line)}
-  .cap-head .cap-t{flex:1;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
-  .cap-head button{background:none;border:none;color:var(--mut);cursor:pointer;font-size:14px;padding:2px 6px}
-  .cap-head button:hover{color:var(--acc)}
-  .cap-body{padding:8px 14px;max-height:84px;overflow-y:auto;text-align:center}
+  .cap-x{position:absolute;top:3px;right:6px;background:none;border:none;color:var(--mut);
+    cursor:pointer;font-size:12px;line-height:1;padding:2px 4px;z-index:2}
+  .cap-x:hover{color:var(--acc)}
+  .cap-body{padding:8px 22px;max-height:84px;overflow-y:auto;text-align:center}
   .cap-line{font-size:13px;color:var(--mut);padding:2px 0;cursor:pointer;line-height:1.4}
   .cap-line.on{color:var(--fg);font-weight:700;font-size:15px}
   .cap-line:hover{color:var(--acc)}
@@ -200,10 +200,7 @@
 </aside>
 
 <div id="capBox" class="capbox hide">
-  <div class="cap-head" id="capDrag">
-    <span class="cap-t">Subtitles</span>
-    <button id="capHide" title="Hide">✕</button>
-  </div>
+  <button class="cap-x" id="capHide" title="Hide">✕</button>
   <div class="cap-body" id="capBody"></div>
 </div>
 <button id="capOpen" class="capopen hide" title="Show subtitles">💬</button>
@@ -535,7 +532,7 @@ function applyHash(){
 }
 
 // =================== subtitles / lyrics overlay ===================
-let LYRICS=null, lyricsP=null, CURCUES=null, capActive=-1;
+let LYRICS=null, lyricsP=null, CURCUES=null, capActive=-1, capMoved=false;
 const CAPLS='asmr_cap';
 function ensureLyrics(){ return lyricsP||(lyricsP=
   fetch('data/lyrics.json').then(r=>r.json()).catch(()=>({})).then(m=>{LYRICS=m;})); }
@@ -547,7 +544,7 @@ function setCues(path){
     const body=$('#capBody'); body.innerHTML='';
     if(CURCUES) CURCUES.forEach((c,i)=>{ const d=document.createElement('div');
       d.className='cap-line'; d.dataset.i=i; d.textContent=c[1];
-      d.onclick=()=>{A.currentTime=c[0];}; body.appendChild(d); });
+      d.onclick=()=>{ if(capMoved)return; A.currentTime=c[0]; }; body.appendChild(d); });
     updateCapVis();
   });
 }
@@ -574,16 +571,19 @@ A.addEventListener('timeupdate',()=>{
   body.querySelectorAll('.cap-line').forEach(d=>d.classList.toggle('on',+d.dataset.i===idx));
   const on=body.querySelector('.cap-line.on'); if(on) on.scrollIntoView({block:'center'});
 });
-(function(){ const box=$('#capBox'), head=$('#capDrag'); let dx=0,dy=0,drag=false;
-  head.addEventListener('pointerdown',e=>{ if(e.target.tagName==='BUTTON')return;
-    drag=true; const r=box.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top;
-    head.setPointerCapture(e.pointerId); });
-  head.addEventListener('pointermove',e=>{ if(!drag)return;
-    let x=Math.max(0,Math.min(innerWidth-box.offsetWidth, e.clientX-dx));
-    let y=Math.max(0,Math.min(innerHeight-box.offsetHeight, e.clientY-dy));
+(function(){ const box=$('#capBox'); let dx=0,dy=0,sx=0,sy=0,drag=false;
+  box.addEventListener('pointerdown',e=>{ if(e.target.closest('.cap-x'))return;
+    drag=true; capMoved=false; sx=e.clientX; sy=e.clientY;
+    const r=box.getBoundingClientRect(); dx=e.clientX-r.left; dy=e.clientY-r.top;
+    box.setPointerCapture(e.pointerId); });
+  box.addEventListener('pointermove',e=>{ if(!drag)return;
+    if(!capMoved && Math.hypot(e.clientX-sx,e.clientY-sy)<4) return;   // ignore jitter
+    capMoved=true;
+    const x=Math.max(0,Math.min(innerWidth-box.offsetWidth, e.clientX-dx));
+    const y=Math.max(0,Math.min(innerHeight-box.offsetHeight, e.clientY-dy));
     box.style.left=x+'px'; box.style.top=y+'px'; box.style.bottom='auto'; box.style.transform='none'; });
-  head.addEventListener('pointerup',()=>{ if(!drag)return; drag=false;
-    saveCap({x:parseInt(box.style.left),y:parseInt(box.style.top)}); });
+  box.addEventListener('pointerup',()=>{ if(!drag)return; drag=false;
+    if(capMoved) saveCap({x:parseInt(box.style.left),y:parseInt(box.style.top)}); });
 })();
 
 // =================== persistence ===================
